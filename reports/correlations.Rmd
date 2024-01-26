@@ -1,0 +1,156 @@
+---
+title: "Target Proteins Data Analysis"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(Hmisc)
+library(corrplot)
+library(RColorBrewer)
+library(ggplot2)
+library(dplyr)
+```
+
+Importing data and subsetting it to work with needed descriptors only (without descriptors for proteins):
+```{r}
+b2ar <- read.csv("chembl_b2ar/all_descriptors.csv")
+b2ar_cor <- b2ar[, 5:48]
+
+cb2 <- read.csv("chembl_cb2/cb2_all_descriptors.csv")
+cb2_cor <- cb2[, 4:47]
+
+ckr5 <- read.csv("chembl_ckr5/ckr5_all_descriptors.csv")
+ckr5_cor <- ckr5[, 4:47]
+
+drd1 <- read.csv("chembl_drd1/drd1_all_descriptors.csv")
+drd1_cor <- drd1[, 4:47]
+```
+Creating correlation matrix to check the possible connection between descriotors and Ki (with p-value to ensure significance):
+```{r}
+cor_cb2 <- rcorr(as.matrix(cb2_cor),type="pearson")
+cor_b2ar <- rcorr(as.matrix(b2ar_cor),type="pearson")
+cor_ckr5 <- rcorr(as.matrix(ckr5_cor),type="pearson")
+cor_drd1 <- rcorr(as.matrix(drd1_cor),type="pearson")
+```
+Boxplots:
+```{r}
+boxplot(cb2_cor$Ki)
+boxplot(b2ar_cor$Ki)
+boxplot(ckr5_cor$Ki)
+boxplot(drd1_cor$Ki)
+```
+Bosxplots with outliers dropped: 
+```{r}
+b2ar_cor_1 <- b2ar_cor %>%
+  mutate(newcol = 1)
+
+cb2_cor_1 <- cb2_cor %>%
+  mutate(newcol = 1)
+
+ckr5_cor_1 <- ckr5_cor %>%
+  mutate(newcol = 1)
+
+drd1_cor_1 <- drd1_cor %>%
+  mutate(newcol = 1)
+
+p_ref1 <- ggplot(b2ar_cor_1, aes(newcol, Ki)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  coord_cartesian(ylim = c(0, 4000)) +
+  scale_y_continuous(limits = quantile(b2ar_cor$Ki, c(0.1, 0.9))) 
+p_ref1
+
+p_ref2 <- ggplot(cb2_cor_1, aes(newcol, Ki)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  coord_cartesian(ylim = c(0, 4000)) +
+  scale_y_continuous(limits = quantile(cb2_cor$Ki, c(0.1, 0.9))) 
+p_ref2
+
+p_ref3 <- ggplot(ckr5_cor_1, aes(newcol, Ki)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  coord_cartesian(ylim = c(0, 4000)) +
+  scale_y_continuous(limits = quantile(ckr5_cor$Ki, c(0.1, 0.9))) 
+p_ref3
+
+p_ref4 <- ggplot(drd1_cor_1, aes(newcol, Ki)) + 
+  geom_boxplot(outlier.shape = NA) + 
+  coord_cartesian(ylim = c(0, 4000)) +
+  scale_y_continuous(limits = quantile(drd1_cor$Ki, c(0.1, 0.9))) 
+p_ref4
+```
+Statistics:
+```{r}
+mean(cb2_cor$Ki)
+median(cb2_cor$Ki)
+sd(cb2_cor$Ki)
+
+mean(b2ar_cor$Ki)
+median(b2ar_cor$Ki)
+sd(b2ar_cor$Ki)
+
+mean(ckr5_cor$Ki)
+median(ckr5_cor$Ki)
+sd(ckr5_cor$Ki)
+
+mean(drd1_cor$Ki)
+median(drd1_cor$Ki)
+sd(drd1_cor$Ki)
+```
+Normality tests: 
+```{r}
+ks.test(cb2_cor$Ki, "pnorm", mean=mean(cb2_cor$Ki), sd=sd(cb2_cor$Ki))
+ks.test(b2ar_cor$Ki, "pnorm", mean=mean(b2ar_cor$Ki), sd=sd(b2ar_cor$Ki))
+ks.test(ckr5_cor$Ki, "pnorm", mean=mean(ckr5_cor$Ki), sd=sd(ckr5_cor$Ki))
+ks.test(drd1_cor$Ki, "pnorm", mean=mean(drd1_cor$Ki), sd=sd(drd1_cor$Ki))
+```
+Heatmaps for descriptors correlations: 
+```{r}
+M <-cor(b2ar_cor)
+M2 <- cor(cb2_cor)
+M3 <- cor(ckr5_cor)
+M4 <- cor(drd1_cor)
+
+corrplot(M2, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
+
+corrplot(M, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
+
+corrplot(M3, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
+
+corrplot(M4, type="upper", order="hclust",
+         col=brewer.pal(n=8, name="RdYlBu"))
+```
+Correaltion graphs:
+```{r}
+for (i in seq_along(M)) {
+  plot(b2ar_cor$Ki, b2ar_cor[, i + 1], main = names(b2ar_cor)[i + 1],
+       xlab = "Ki", ylab = names(b2ar_cor)[i + 1])
+}
+```
+```{r}
+for (i in seq_along(M2)) {
+  plot(cb2_cor$Ki, cb2_cor[, i + 1], main = names(cb2_cor)[i + 1],
+       xlab = "Ki", ylab = names(cb2_cor)[i + 1])
+}
+```
+
+```{r}
+for (i in seq_along(M3)) {
+  plot(ckr5_cor$Ki, ckr5_cor[, i + 1], main = names(ckr5_cor)[i + 1],
+       xlab = "Ki", ylab = names(ckr5_cor)[i + 1])
+}
+```
+`
+
+```{r}
+for (i in seq_along(M4)) {
+  plot(drd1_cor$Ki, drd1_cor[, i + 1], main = names(drd1_cor)[i + 1],
+       xlab = "Ki", ylab = names(drd1_cor)[i + 1])
+}
+```
+
