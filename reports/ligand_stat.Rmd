@@ -1,0 +1,151 @@
+---
+title: "PDBind Dataset Analysis"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+Packages used:
+```{r}
+library(tidyverse)
+library(stringr)
+library(dplyr) 
+library(psych)
+```
+First, data import and preparation:
+```{r}
+data <- read.table("INDEX_refined_data.2020")
+data <- subset(data, select = -6)
+data <- setNames(data, c("PDB_code", "res", "release", "-log", "K_value", "ref", "ligand"))
+data[c('label', 'value')] <- str_split_fixed(data$K_value, '=', 2)
+data <- subset(data, select = -K_value)
+```
+
+```{r}
+name <- read.table("refined_name_1.txt", head = TRUE)
+name$protein <- as.factor(name$protein)
+```
+
+```{r}
+general_data <- read.table("INDEX_general_data.txt", header = T)
+general_data[c('label', 'value')] <- str_split_fixed(general_data$Kd.Ki, pattern = "[=~<>]", n = 2)
+general_data <- subset(general_data, select = -Kd.Ki)
+
+general_data[] <- lapply(general_data, gsub, pattern='=', replacement='')
+```
+
+Creation of a function to convert the value to one unit: 
+
+```{r}
+convert_to_uM <- function(value, unit) { 
+  conversion_factors <- c('pM' = 1e-6, 'nM' = 1e-3, 'uM' = 1, 'mM' = 1e3, 'M' = 1e6,'fM' = 1e-9) 
+  value_uM <- as.numeric(gsub("[^0-9.]", "", value)) # Extract numeric values 
+  converted_value <- value_uM * conversion_factors[unit] 
+  return(converted_value) 
+} 
+```
+And applying it to data:
+```{r}
+data <- data %>% 
+  mutate(value_uM = mapply(convert_to_uM, value, gsub("[0-9.]", "", value))) 
+```
+Also, the datasetis to be split into several parts due to different values provided:
+```{r}
+data <- data %>%
+  mutate(label = recode(label, "Ki<" = "Ki"))
+split <- split(data, data$label)
+data_Ki <- split$Ki
+data_Kd <- split$Kd
+```
+
+```{r}
+general_data <- general_data %>% 
+  mutate(value_uM = mapply(convert_to_uM, value, gsub("[0-9.]", "", value))) 
+
+general_data$label <- as.factor(general_data$label)
+```
+
+Statistics:
+```{r}
+mean(data_Kd$value_uM)
+mean(data_Ki$value_uM)
+median(data_Kd$value_uM)
+median(data_Ki$value_uM)
+sd(data_Kd$value_uM)
+sd(data_Ki$value_uM)
+shapiro.test(data_Ki$value_uM)
+shapiro.test(data_Kd$value_uM)
+```
+Also, we create a united dataset containing both information of protein name and 
+```{r}
+dataset <- merge(data, name, by = "PDB_code")
+dataset <- subset(dataset, select = -value)
+dataset <- subset(dataset, select = -release_year)
+
+dataset$protein <- as.factor(dataset$protein)
+dataset$label <- as.factor(dataset$label)
+dataset <- dataset %>%
+  mutate(label = recode(label, "Ki<" = "Ki"))
+dataset$ligand <- as.factor(dataset$ligand)
+
+```
+Anova:
+```{r}
+ana <- aov(value_uM ~ protein, data = dataset)
+summary(ana)
+```
+Boxplots to see distribution:
+```{r}
+boxplot(dataset$value_uM ~ dataset$label)
+```
+
+```{r}
+p_ref <- ggplot(data, aes(label, value_uM)) + 
+  geom_boxplot(outlier.shape = NA) +
+  scale_y_continuous(limits = quantile(data$value_uM, c(0.1, 0.9)))
+p_ref  
+```
+Normality check with Q-Q plots:
+```{r}
+qqnorm(data_Kd$value_uM)
+qqline(data_Kd$value_uM)
+
+qqnorm(data_Ki$value_uM)
+qqline(data_Ki$value_uM)
+```
+
+Graphs for general dataset: 
+```{r}
+boxplot(general_data$value_uM ~ general_data$label)
+```
+```{r}
+p2 <- ggplot(general_data, aes(label, value_uM)) + 
+  geom_boxplot(outlier.shape = NA) +
+  scale_y_continuous(limits = quantile(general_data$value_uM, c(0.1, 0.9)))
+p2
+```
+
+```{r}
+split <- split(general_data, general_data$label)
+
+g_data_Ki <- split$Ki
+g_data_Kd <- split$Kd
+g_data_IC <- split$IC50
+```
+
+```{r}
+qqnorm(g_data_Ki$value_uM)
+qqline(g_data_Ki$value_uM)
+
+qqnorm(g_data_Kd$value_uM)
+qqline(g_data_Kd$value_uM)
+
+qqnorm(g_data_IC$value_uM)
+qqline(g_data_IC$value_uM)
+```
+
+```{r}
+describe(g_data_Ki)
+describe(g_data_Kd)
+describe(g_data_IC)
+```
+
